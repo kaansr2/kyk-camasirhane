@@ -1,5 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Bell, Loader2 } from 'lucide-react';
+import { initializeApp } from 'firebase/app';
+import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyC3SDdPZV4vSTgWoDuUw4FF239k-_rgk68",
+  authDomain: "kyk-camasirhane.firebaseapp.com",
+  projectId: "kyk-camasirhane",
+  storageBucket: "kyk-camasirhane.firebasestorage.app",
+  messagingSenderId: "440802885513",
+  appId: "1:440802885513:web:b4aa8065bfc9d5ae1a6b58"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
 export default function LaundrySystem() {
   const [activeTab, setActiveTab] = useState('washer');
@@ -18,32 +32,25 @@ export default function LaundrySystem() {
   });
 
   useEffect(() => {
-    loadData();
+    const q = query(collection(db, 'laundry'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setEntries(data);
+      setLoading(false);
+    });
+
     const interval = setInterval(() => {
       checkNotifications();
     }, 30000);
-    return () => clearInterval(interval);
-  }, [entries]);
 
-  const loadData = () => {
-    try {
-      const stored = localStorage.getItem('laundry-entries');
-      if (stored) {
-        setEntries(JSON.parse(stored));
-      }
-    } catch (error) {
-      console.log('İlk kullanım');
-    }
-    setLoading(false);
-  };
-
-  const saveData = (newEntries) => {
-    try {
-      localStorage.setItem('laundry-entries', JSON.stringify(newEntries));
-    } catch (error) {
-      console.error('Kayıt hatası:', error);
-    }
-  };
+    return () => {
+      unsubscribe();
+      clearInterval(interval);
+    };
+  }, []);
 
   const requestNotificationPermission = async () => {
     if ('Notification' in window) {
@@ -61,8 +68,8 @@ export default function LaundrySystem() {
     if (!notificationsEnabled || !('Notification' in window)) return;
     
     const now = new Date();
-    const updatedEntries = entries.map(entry => {
-      if (entry.notified) return entry;
+    entries.forEach(entry => {
+      if (entry.notified) return;
       
       const [hours, minutes] = entry.endTime.split(':');
       const endDateTime = new Date();
@@ -78,53 +85,49 @@ export default function LaundrySystem() {
             tag: `laundry-${entry.id}`
           });
         }
-        return { ...entry, notified: true };
       }
-      return entry;
     });
-    
-    if (JSON.stringify(updatedEntries) !== JSON.stringify(entries)) {
-      setEntries(updatedEntries);
-      saveData(updatedEntries);
-    }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!formData.name || !formData.phone || !formData.room || !formData.machineNumber || !formData.startTime || !formData.endTime) {
       alert('❌ Lütfen tüm alanları doldurun!');
       return;
     }
 
-    const newEntry = {
-      id: Date.now(),
-      ...formData,
-      createdAt: new Date().toISOString(),
-      notified: false
-    };
+    try {
+      await addDoc(collection(db, 'laundry'), {
+        ...formData,
+        createdAt: new Date().toISOString(),
+        notified: false
+      });
 
-    const newEntries = [...entries, newEntry];
-    setEntries(newEntries);
-    saveData(newEntries);
-    
-    setShowForm(false);
-    setFormData({
-      name: '',
-      phone: '',
-      room: '',
-      machineType: activeTab,
-      machineNumber: '',
-      startTime: '',
-      endTime: ''
-    });
+      setShowForm(false);
+      setFormData({
+        name: '',
+        phone: '',
+        room: '',
+        machineType: activeTab,
+        machineNumber: '',
+        startTime: '',
+        endTime: ''
+      });
 
-    alert('✅ Kaydın oluşturuldu! Çamaşırın bitmeden 5 dakika önce bildirim alacaksın.');
+      alert('✅ Kaydın oluşturuldu! Çamaşırın bitmeden 5 dakika önce bildirim alacaksın.');
+    } catch (error) {
+      alert('❌ Kayıt eklenirken hata oluştu!');
+      console.error(error);
+    }
   };
 
-  const deleteEntry = (id) => {
+  const deleteEntry = async (id) => {
     if (confirm('Bu kaydı silmek istediğinden emin misin?')) {
-      const newEntries = entries.filter(e => e.id !== id);
-      setEntries(newEntries);
-      saveData(newEntries);
+      try {
+        await deleteDoc(doc(db, 'laundry', id));
+      } catch (error) {
+        alert('❌ Silme işlemi başarısız!');
+        console.error(error);
+      }
     }
   };
 
@@ -144,10 +147,7 @@ export default function LaundrySystem() {
     return endDateTime > now;
   };
 
-  const filteredEntries = entries
-    .filter(e => e.machineType === activeTab)
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
+  const filteredEntries = entries.filter(e => e.machineType === activeTab);
   const activeEntries = filteredEntries.filter(isActive);
   const completedEntries = filteredEntries.filter(e => !isActive(e));
 
