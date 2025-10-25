@@ -1,19 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Bell, Loader2 } from 'lucide-react';
-import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
-
-const firebaseConfig = {
-  apiKey: "AIzaSyC3SDdPZV4vSTgWoDuUw4FF239k-_rgk68",
-  authDomain: "kyk-camasirhane.firebaseapp.com",
-  projectId: "kyk-camasirhane",
-  storageBucket: "kyk-camasirhane.firebasestorage.app",
-  messagingSenderId: "440802885513",
-  appId: "1:440802885513:web:b4aa8065bfc9d5ae1a6b58"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
 
 export default function LaundrySystem() {
   const [activeTab, setActiveTab] = useState('washer');
@@ -32,7 +18,14 @@ export default function LaundrySystem() {
   });
 
   useEffect(() => {
-    const q = query(collection(db, 'laundry'), orderBy('createdAt', 'desc'));
+    if (!window.db || !window.firebaseImports) {
+      setTimeout(() => setLoading(false), 1000);
+      return;
+    }
+
+    const { collection, query, orderBy, onSnapshot } = window.firebaseImports;
+    const q = query(collection(window.db, 'laundry'), orderBy('createdAt', 'desc'));
+    
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({
         id: doc.id,
@@ -96,7 +89,8 @@ export default function LaundrySystem() {
     }
 
     try {
-      await addDoc(collection(db, 'laundry'), {
+      const { collection, addDoc } = window.firebaseImports;
+      await addDoc(collection(window.db, 'laundry'), {
         ...formData,
         createdAt: new Date().toISOString(),
         notified: false
@@ -123,7 +117,8 @@ export default function LaundrySystem() {
   const deleteEntry = async (id) => {
     if (confirm('Bu kaydı silmek istediğinden emin misin?')) {
       try {
-        await deleteDoc(doc(db, 'laundry', id));
+        const { doc, deleteDoc } = window.firebaseImports;
+        await deleteDoc(doc(window.db, 'laundry', id));
       } catch (error) {
         alert('❌ Silme işlemi başarısız!');
         console.error(error);
