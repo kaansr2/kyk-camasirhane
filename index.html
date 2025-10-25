@@ -7,6 +7,23 @@
   </head>
   <body>
     <div id="root"></div>
+    <script type="module">
+      import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+      import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query, orderBy } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+      
+      window.firebaseConfig = {
+        apiKey: "AIzaSyC3SDdPZV4vSTgWoDuUw4FF239k-_rgk68",
+        authDomain: "kyk-camasirhane.firebaseapp.com",
+        projectId: "kyk-camasirhane",
+        storageBucket: "kyk-camasirhane.firebasestorage.app",
+        messagingSenderId: "440802885513",
+        appId: "1:440802885513:web:b4aa8065bfc9d5ae1a6b58"
+      };
+      
+      const app = initializeApp(window.firebaseConfig);
+      window.db = getFirestore(app);
+      window.firebaseImports = { collection, addDoc, onSnapshot, deleteDoc, doc, query, orderBy };
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
